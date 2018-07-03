@@ -4,35 +4,38 @@ import codecs
 import jieba
 import jieba.posseg
 
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer, TfidfTransformer
 from sklearn.linear_model import LogisticRegression
 from sklearn import svm
 from sklearn.metrics import log_loss
+from sklearn import metrics
 
 from joblib import Parallel, delayed
 import logging
 
 
 def del_stop_words_train(words, stop_words_set):
+    if type(words) != type(" "):
+        return np.nan
     result = jieba.posseg.cut(words)
     new_words = []
     for word in result:
         if word.word not in stop_words_set and word.flag is not "x":
             new_words.append(word.word)
     ans = ' '.join(new_words)
-    return ans if len(ans) > 20 else np.nan
+    return ans if len(ans) > 0 else np.nan
 
 
 def del_stop_words_test(words, stop_words_set):
-    # if type(words) != type(" "):
-    #     return np.nan
+    if type(words) != type(" "):
+        return "NaN"
     result = jieba.posseg.cut(words)
     new_words = []
     for word in result:
         if word.word not in stop_words_set and word.flag is not "x":
             new_words.append(word.word)
     ans = ' '.join(new_words)
-    return ans if len(ans) > 20 else np.nan
+    return ans if len(ans) > 0 else "NaN"
 
 
 def log_reg(train, test, metrics_df, cols):
@@ -66,9 +69,8 @@ def svm_reg(train, test, metrics_df, cols):
 
 if __name__ == '__main__':
     # ----------------Set Path----------------------------------------
-    train_path = "./input/trim_2k.csv"
-    test_path = "./input/validation.csv"
-    output_path = "./output/"
+    train_path = "./input/training_new.csv"
+    test_path = "./input/validation_new.csv"
     logging.basicConfig(level=logging.DEBUG)
     logger = logging.getLogger(__name__)
     # ----------------------------------------------------------------
@@ -92,60 +94,73 @@ if __name__ == '__main__':
     stop_list = [line.strip() for line in codecs.open(stop_words_path, 'r', encoding='gb2312').readlines()]
     stop_words = set(stop_list)
     if len(stop_words) > 0:
-        logger.debug("Got stop words set!\n")
+        logger.info("Got stop words set!\n")
 
     raw_train["Content"] = Parallel(n_jobs=4, verbose=10)(
         delayed(del_stop_words_train)(raw_train.iloc[index]["Content"], stop_words) for index in range(len(raw_train)))
     raw_train = raw_train.dropna(subset=["Content"])
     print("Training data shape after remove stop words\n", raw_train.shape)
 
-    # test_data["Content"] = Parallel(n_jobs=4, verbose=10)(
-    #     delayed(del_stop_words_test)(test_data.iloc[index]["Content"], stop_words) for index in range(len(test_data)))
-    # test_data = test_data.dropna(subset=["Content"])
-    # print("Test data shape after remove stop words\n", test_data.shape)
-
-    for i in range(20):
-        print(raw_train.iloc[i].Content)
+    test_data["Content"] = Parallel(n_jobs=4, verbose=10)(
+        delayed(del_stop_words_test)(test_data.iloc[index]["Content"], stop_words) for index in range(len(test_data)))
+    test_data = test_data.dropna(subset=["Content"])
+    print("Test data shape after remove stop words\n", test_data.shape)
 
     # ----------------------------------------------------------------
 
-    # # ----------------Deal with the dummmy variables----------------
-    # dummy_fields = ["Label"]
-    #
-    # for each in dummy_fields:
-    #     dummies = pd.get_dummies(raw_train.loc[:, each], prefix=each)
-    #     raw_train = pd.concat([raw_train, dummies], axis=1)
-    #
-    # fields_to_drop = ["Label"]
-    #
-    # data = raw_train.drop(fields_to_drop, axis=1)
-    #
-    # columns = data.columns.tolist()
-    # metrics = data[columns[1:]]
-    # # ----------------------------------------------------------------
-    #
-    # # ------------------Vectorization-----------------------------
-    # # Initialize vectorizer and apply it to training set
-    # vectorizer = TfidfVectorizer(min_df=3, max_df=0.8,
-    #                              ngram_range=(1, 2),
-    #                              strip_accents='unicode',
-    #                              smooth_idf=True,
-    #                              sublinear_tf=True)
-    #
-    # print('Applying vectorizer to training set...')
-    # vectorizer = vectorizer.fit(data["Content"])
-    # train_vectorized = vectorizer.transform(data["Content"])
-    # print("Train vectorization finished")
-    # # ----------------------------------------------------------------
-    #
-    # test_vectorized = vectorizer.transform(test_data["Content"])
-    #
-    # # ----------------------------------------------------------------
-    #
-    # submission = pd.DataFrame([], columns=columns[1:])
-    #
-    # for col in metrics:
-    #     submission[col] = log_reg(train_vectorized, test_vectorized, metrics, col)
-    #
-    # print("Submission shape\n", submission.shape)
-    # submission.to_csv("./output/submission_predict_log_old.csv", index=False)
+    # ----------------Deal with the dummmy variables----------------
+    dummy_fields = ["Label"]
+
+    for each in dummy_fields:
+        dummies = pd.get_dummies(raw_train.loc[:, each], prefix=each)
+        raw_train = pd.concat([raw_train, dummies], axis=1)
+
+    fields_to_drop = ["Label"]
+
+    data = raw_train.drop(fields_to_drop, axis=1)
+
+    columns = data.columns.tolist()
+    metrics = data[columns[1:]]
+    # ----------------------------------------------------------------
+
+    # ------------------Vectorization-----------------------------
+    all_text = raw_train.append(test_data)
+    count_v0 = CountVectorizer()
+    counts_all = count_v0.fit_transform(all_text["Content"])
+    count_v1 = CountVectorizer(vocabulary=count_v0.vocabulary_)
+
+    counts_train = count_v1.fit_transform(raw_train["Content"])
+    print("the shape of train is " + repr(counts_train.shape))
+
+    count_v2 = CountVectorizer(vocabulary=count_v0.vocabulary_)
+    counts_test = count_v2.fit_transform(test_data["Content"])
+    print("the shape of test is " + repr(counts_test.shape))
+
+    tfidf_transformer = TfidfTransformer()
+    train_vectorized = tfidf_transformer.fit(counts_train).transform(counts_train)
+    test_vectorized = tfidf_transformer.fit(counts_test).transform(counts_test)
+
+    # # # Initialize vectorizer and apply it to training set
+    # # vectorizer = TfidfVectorizer(min_df=3, max_df=0.8,
+    # #                              ngram_range=(1, 2),
+    # #                              strip_accents='unicode',
+    # #                              smooth_idf=True,
+    # #                              sublinear_tf=True)
+    # #
+    # # print('Applying vectorizer to training set...')
+    # # vectorizer = vectorizer.fit(data["Content"])
+    # # train_vectorized = vectorizer.transform(data["Content"])
+    # # print("Train vectorization finished")
+    # # # ----------------------------------------------------------------
+    # #
+    # # test_vectorized = vectorizer.transform(test_data["Content"])
+
+    # ----------------------------------------------------------------
+
+    submission = pd.DataFrame([], columns=columns[1:])
+
+    for col in metrics:
+        submission[col] = log_reg(train_vectorized, test_vectorized, metrics, col)
+
+    print("Submission shape\n", submission.shape)
+    submission.to_csv("./output/sub_trim_2k.csv", index=False)
