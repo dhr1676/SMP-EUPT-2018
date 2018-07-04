@@ -12,6 +12,7 @@ from sklearn import metrics
 
 from joblib import Parallel, delayed
 import logging
+import time
 
 
 def del_stop_words_train(words, stop_words_set):
@@ -69,6 +70,7 @@ def svm_reg(train, test, metrics_df, cols):
 
 if __name__ == '__main__':
     # ----------------Set Path----------------------------------------
+    start_time = time.time()
     train_path = "./input/training_new.csv"
     test_path = "./input/validation_new.csv"
     logging.basicConfig(level=logging.DEBUG)
@@ -89,7 +91,7 @@ if __name__ == '__main__':
     # print(test_data.describe())
     # ----------------------------------------------------------------
 
-    # ----------------Remove Stop Words-----------------------------
+    # ----------------Remove Stop Words-------------------------------
     stop_words_path = "./input/stop_words_zh.txt"
     stop_list = [line.strip() for line in codecs.open(stop_words_path, 'r', encoding='gb2312').readlines()]
     stop_words = set(stop_list)
@@ -108,7 +110,7 @@ if __name__ == '__main__':
 
     # ----------------------------------------------------------------
 
-    # ----------------Deal with the dummmy variables----------------
+    # ----------------Deal with the dummmy variables------------------
     dummy_fields = ["Label"]
 
     for each in dummy_fields:
@@ -123,7 +125,7 @@ if __name__ == '__main__':
     metrics = data[columns[1:]]
     # ----------------------------------------------------------------
 
-    # ------------------Vectorization-----------------------------
+    # ------------------Vectorization---------------------------------
     all_text = raw_train.append(test_data)
     count_v0 = CountVectorizer()
     counts_all = count_v0.fit_transform(all_text["Content"])
@@ -164,3 +166,6 @@ if __name__ == '__main__':
 
     print("Submission shape\n", submission.shape)
     submission.to_csv("./output/sub_all.csv", index=False)
+
+    end_time = time.time()
+    print("Running time: %f s\n" % (end_time - start_time))

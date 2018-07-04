@@ -4,8 +4,6 @@ from joblib import Parallel, delayed
 
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import codecs
 import jieba
 import jieba.posseg
 
@@ -51,18 +49,18 @@ def get_label(label):
 """
 
 if __name__ == '__main__':
-    start_time = time.time()
     # ----------------Set Path----------------------------------------
-    train_path = "./input/training_new_split.csv"
-    # train_path = "./input/trim_2k_split.csv"
+    start_time = time.time()
+    # train_path = "./input/training_new_split.csv"
+    train_path = "./input/trim_2k_split.csv"
     test_path = "./input/validation_new_split.csv"
     logging.basicConfig(level=logging.DEBUG)
     logger = logging.getLogger(__name__)
     # ----------------------------------------------------------------
 
+    # ----------------Read Train Data---------------------------------
     raw_train = pd.read_csv(train_path, encoding="utf-8")
     raw_train = raw_train.dropna(subset=["Content"])
-
     print("Training data shape", raw_train.shape)
     # print(raw_train.describe())
     # ----------------------------------------------------------------
@@ -74,31 +72,13 @@ if __name__ == '__main__':
     # print(test_data.describe())
     # ----------------------------------------------------------------
 
-    # # ----------------Remove Stop Words-----------------------------
-    # stop_words_path = "./input/stop_words_zh.txt"
-    # stop_list = [line.strip() for line in codecs.open(stop_words_path, 'r', encoding='gb2312').readlines()]
-    # stop_words = set(stop_list)
-    # if len(stop_words) > 0:
-    #     logger.info("Got stop words set!\n")
-    #
-    # raw_train["Content"] = Parallel(n_jobs=4, verbose=10)(
-    #     delayed(del_stop_words_train)(raw_train.iloc[index]["Content"], stop_words) for index in range(len(raw_train)))
-    # raw_train = raw_train.dropna(subset=["Content"])
-    # print("Training data shape after remove stop words\n", raw_train.shape)
-    #
-    # test_data["Content"] = Parallel(n_jobs=4, verbose=10)(
-    #     delayed(del_stop_words_test)(test_data.iloc[index]["Content"], stop_words) for index in range(len(test_data)))
-    # test_data = test_data.dropna(subset=["Content"])
-    # print("Test data shape after remove stop words\n", test_data.shape)
-    #
-    # # ----------------------------------------------------------------
-
     # ----------------Get Label-----------------------------
     raw_train["Label"] = Parallel(n_jobs=4, verbose=10)(
         delayed(get_label)(raw_train.iloc[index]["Label"]) for index in range(len(raw_train)))
     # ----------------------------------------------------------------
 
     # ----------------Set Parameters-----------------------------
+    print("Start Pad Sequence...\n")
     MAX_SEQUENCE_LENGTH = 700  # 每条新闻最大长度
     EMBEDDING_DIM = 200  # 词向量空间维度
     VALIDATION_SPLIT = 0.2  # 验证集比例
@@ -145,10 +125,9 @@ if __name__ == '__main__':
                   optimizer='rmsprop',
                   metrics=['acc'])
 
-    # model.fit(x_train, y_train, validation_data=(x_val, y_val), epochs=2, batch_size=128)
+    print("Start training!..\n")
     model.fit(x_train, y_train, epochs=2, batch_size=128)
-    # model.save('cnn.h5')
-    # print(model.evaluate(x_test, y_test))
+    model.save('cnn_nr_stopwords.h5')
     y_predict = model.predict(x_test)
     print(type(y_predict))
     print("y_predict type", type(y_predict))
@@ -157,7 +136,7 @@ if __name__ == '__main__':
     # ----------------Output to the File------------------------------
     submission = pd.DataFrame(y_predict)
 
-    submission.to_csv("./output/dl_all.csv", index=False)
+    submission.to_csv("./output/hey.csv", index=False)
 
     logger.info("Training is Done!\n")
 
