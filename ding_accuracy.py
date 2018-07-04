@@ -3,7 +3,7 @@ import re
 
 if __name__ == '__main__':
     # ----------------Read Data----------------
-    data_path = "./output/submission_predict_log_old.csv"
+    data_path = "./output/sub_trim_2k.csv"
     sample_path = "./input/validation.csv"
     ss_path = "./output/eupt_sample_submission.csv"
     raw_data = pd.read_csv(data_path, encoding="utf-8")

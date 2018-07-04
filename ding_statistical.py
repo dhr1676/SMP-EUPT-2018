@@ -163,4 +163,4 @@ if __name__ == '__main__':
         submission[col] = log_reg(train_vectorized, test_vectorized, metrics, col)
 
     print("Submission shape\n", submission.shape)
-    submission.to_csv("./output/sub_trim_2k.csv", index=False)
+    submission.to_csv("./output/sub_all.csv", index=False)
