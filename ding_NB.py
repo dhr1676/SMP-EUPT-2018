@@ -10,6 +10,8 @@ from sklearn.naive_bayes import MultinomialNB
 
 from joblib import Parallel, delayed
 import logging
+import multiprocessing
+
 
 
 def del_stop_words(words, stop_words_set):
@@ -60,8 +62,9 @@ def restore_label(number):
 """
 
 if __name__ == '__main__':
-    start_time = time.time()
     # ----------------Set Path----------------------------------------
+    start_time = time.time()
+    NUM_CORES = multiprocessing.cpu_count()
     train_path = "./input/training_new_split.csv"
     test_path = "./input/validation_new_split.csv"
 
@@ -95,19 +98,19 @@ if __name__ == '__main__':
     if len(stop_words) > 0:
         print("Got stop words set!\n")
 
-    raw_train["Content"] = Parallel(n_jobs=4, verbose=10)(
+    raw_train["Content"] = Parallel(n_jobs=NUM_CORES, verbose=10)(
         delayed(del_stop_words)(raw_train.iloc[index]["Content"], stop_words) for index in range(len(raw_train)))
 
-    raw_train["Label"] = Parallel(n_jobs=4, verbose=10)(
+    raw_train["Label"] = Parallel(n_jobs=NUM_CORES, verbose=10)(
         delayed(get_label)(raw_train.iloc[index]["Label"]) for index in range(len(raw_train)))
 
     raw_train = raw_train.dropna(subset=["Content"])
     print("Training data shape after remove stop words\n", raw_train.shape)
 
-    test_data["Content"] = Parallel(n_jobs=4, verbose=10)(
+    test_data["Content"] = Parallel(n_jobs=NUM_CORES, verbose=10)(
         delayed(del_stop_words)(test_data.iloc[index]["Content"], stop_words) for index in range(len(test_data)))
 
-    # test_data["Label"] = Parallel(n_jobs=4, verbose=10)(
+    # test_data["Label"] = Parallel(n_jobs=NUM_CORES, verbose=10)(
     #     delayed(get_label)(test_data.iloc[index]["Label"]) for index in range(len(test_data)))
 
     test_data = test_data.dropna(subset=["Content"])

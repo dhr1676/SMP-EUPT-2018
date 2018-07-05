@@ -1,6 +1,8 @@
 import logging
 import time
 from joblib import Parallel, delayed
+import multiprocessing
+
 
 import pandas as pd
 import numpy as np
@@ -13,6 +15,8 @@ from keras.utils import to_categorical
 from keras.layers import Dense, Input, Flatten, Dropout
 from keras.layers import Conv1D, MaxPooling1D, Embedding
 from keras.models import Sequential
+
+from sklearn.utils import shuffle
 
 
 def del_stop_words_train(words, stop_words_set):
@@ -51,8 +55,9 @@ def get_label(label):
 if __name__ == '__main__':
     # ----------------Set Path----------------------------------------
     start_time = time.time()
-    # train_path = "./input/training_new_split.csv"
-    train_path = "./input/trim_2k_split.csv"
+    NUM_CORES = multiprocessing.cpu_count()
+    train_path = "./input/training_new_split.csv"
+    # train_path = "./input/trim_2k_split.csv"
     test_path = "./input/validation_new_split.csv"
     logging.basicConfig(level=logging.DEBUG)
     logger = logging.getLogger(__name__)
@@ -72,23 +77,28 @@ if __name__ == '__main__':
     # print(test_data.describe())
     # ----------------------------------------------------------------
 
+    # ----------------Shuffle Train Data--------------------------------
+    # raw_train = shuffle(raw_train)
+    raw_train = raw_train.sample(frac=1).reset_index(drop=True)
+    print("Training data shape after shuffle", raw_train.shape)
+
     # ----------------Get Label-----------------------------
-    raw_train["Label"] = Parallel(n_jobs=4, verbose=10)(
+    raw_train["Label"] = Parallel(n_jobs=NUM_CORES, verbose=10)(
         delayed(get_label)(raw_train.iloc[index]["Label"]) for index in range(len(raw_train)))
     # ----------------------------------------------------------------
 
     # ----------------Set Parameters-----------------------------
     print("Start Pad Sequence...\n")
-    MAX_SEQUENCE_LENGTH = 700  # 每条新闻最大长度
-    EMBEDDING_DIM = 200  # 词向量空间维度
-    VALIDATION_SPLIT = 0.2  # 验证集比例
-    TEST_SPLIT = 0  # 测试集比例
+    MAX_SEQUENCE_LENGTH = 500       # 每条新闻最大长度
+    EMBEDDING_DIM = 200             # 词向量空间维度
+    VALIDATION_SPLIT = 0.16         # 验证集比例
+    TEST_SPLIT = 0                  # 测试集比例
+    EPOCHS = 3                      # 迭代轮次
 
     labels = to_categorical(np.asarray(raw_train["Label"]))
     del raw_train["Label"]
 
     p1 = len(raw_train)
-    # p2 = len(test_data)
 
     tokenizer = Tokenizer()
     all_text = raw_train.append(test_data)
@@ -113,7 +123,7 @@ if __name__ == '__main__':
 
     model = Sequential()
     model.add(Embedding(len(word_index) + 1, EMBEDDING_DIM, input_length=MAX_SEQUENCE_LENGTH))
-    model.add(Dropout(0.2))
+    model.add(Dropout(0.4))
     model.add(Conv1D(250, 3, padding='valid', activation='relu', strides=1))
     model.add(MaxPooling1D(3))
     model.add(Flatten())
@@ -126,8 +136,8 @@ if __name__ == '__main__':
                   metrics=['acc'])
 
     print("Start training!..\n")
-    model.fit(x_train, y_train, epochs=2, batch_size=128)
-    model.save('cnn_nr_stopwords.h5')
+    model.fit(x_train, y_train, epochs=EPOCHS, batch_size=128, validation_split=VALIDATION_SPLIT)
+    # model.save('cnn_nr_stopwords.h5')
     y_predict = model.predict(x_test)
     print(type(y_predict))
     print("y_predict type", type(y_predict))
@@ -136,7 +146,7 @@ if __name__ == '__main__':
     # ----------------Output to the File------------------------------
     submission = pd.DataFrame(y_predict)
 
-    submission.to_csv("./output/hey.csv", index=False)
+    submission.to_csv("./output/0705_sub_CNN_all.csv", index=False)
 
     logger.info("Training is Done!\n")
 

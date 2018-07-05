@@ -11,6 +11,7 @@ from sklearn.metrics import log_loss
 from sklearn import metrics
 
 from joblib import Parallel, delayed
+import multiprocessing
 import logging
 import time
 
@@ -71,6 +72,7 @@ def svm_reg(train, test, metrics_df, cols):
 if __name__ == '__main__':
     # ----------------Set Path----------------------------------------
     start_time = time.time()
+    NUM_CORES = multiprocessing.cpu_count()
     train_path = "./input/training_new.csv"
     test_path = "./input/validation_new.csv"
     logging.basicConfig(level=logging.DEBUG)
@@ -98,12 +100,12 @@ if __name__ == '__main__':
     if len(stop_words) > 0:
         logger.info("Got stop words set!\n")
 
-    raw_train["Content"] = Parallel(n_jobs=4, verbose=10)(
+    raw_train["Content"] = Parallel(n_jobs=NUM_CORES, verbose=10)(
         delayed(del_stop_words_train)(raw_train.iloc[index]["Content"], stop_words) for index in range(len(raw_train)))
     raw_train = raw_train.dropna(subset=["Content"])
     print("Training data shape after remove stop words\n", raw_train.shape)
 
-    test_data["Content"] = Parallel(n_jobs=4, verbose=10)(
+    test_data["Content"] = Parallel(n_jobs=NUM_CORES, verbose=10)(
         delayed(del_stop_words_test)(test_data.iloc[index]["Content"], stop_words) for index in range(len(test_data)))
     test_data = test_data.dropna(subset=["Content"])
     print("Test data shape after remove stop words\n", test_data.shape)
@@ -160,6 +162,8 @@ if __name__ == '__main__':
     # ----------------------------------------------------------------
 
     submission = pd.DataFrame([], columns=columns[1:])
+
+    test_predict = Parallel()
 
     for col in metrics:
         submission[col] = log_reg(train_vectorized, test_vectorized, metrics, col)
