@@ -56,7 +56,8 @@ if __name__ == '__main__':
     # ----------------Set Path----------------------------------------
     start_time = time.time()
     NUM_CORES = multiprocessing.cpu_count()
-    train_path = "./input/training_new_split.csv"
+    train_path = "./input/train_pseudo_label.csv"
+    # train_path = "./input/training_new_split.csv"
     # train_path = "./input/trim_2k_split.csv"
     test_path = "./input/validation_new_split.csv"
     logging.basicConfig(level=logging.DEBUG)
@@ -65,8 +66,9 @@ if __name__ == '__main__':
 
     # ----------------Read Train Data---------------------------------
     raw_train = pd.read_csv(train_path, encoding="utf-8")
+    print("Training raw data shape", raw_train.shape)
     raw_train = raw_train.dropna(subset=["Content"])
-    print("Training data shape", raw_train.shape)
+    print("Training data drop nan shape", raw_train.shape)
     # print(raw_train.describe())
     # ----------------------------------------------------------------
 
@@ -137,7 +139,7 @@ if __name__ == '__main__':
 
     print("Start training!..\n")
     model.fit(x_train, y_train, epochs=EPOCHS, batch_size=128, validation_split=VALIDATION_SPLIT)
-    # model.save('cnn_nr_stopwords.h5')
+    model.save('cnn_PL.h5')
     y_predict = model.predict(x_test)
     print(type(y_predict))
     print("y_predict type", type(y_predict))
@@ -146,7 +148,7 @@ if __name__ == '__main__':
     # ----------------Output to the File------------------------------
     submission = pd.DataFrame(y_predict)
 
-    submission.to_csv("./output/0705_sub_CNN_all.csv", index=False)
+    submission.to_csv("./output/0705_sub_CNN.csv", index=False)
 
     logger.info("Training is Done!\n")
 
